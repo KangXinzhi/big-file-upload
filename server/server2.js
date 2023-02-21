@@ -1,10 +1,13 @@
+const http2Express = require('http2-express-bridge')
+const http2 = require('http2')
 const multiparty = require("multiparty");
 const bodyParser = require("body-parser");
 const express = require('express')
 const path = require('path')
 const fse = require("fs-extra")
+const fs = require("fs");
 
-let app = express()
+let app = http2Express(express)
 const DirName = path.resolve(path.dirname(''));
 const UPLOAD_FILES_DIR = path.resolve(DirName, "./filelist")
 // 配置请求参数解析器
@@ -109,6 +112,15 @@ app.post('/merge', jsonParser, async (req, res) => {
   });
 })
 
-app.listen(3001, () => {
+app.get('/', (req, res) => {
+  res.status(200).send('HTTP/2 Works!');
+});
+
+const options = {
+  cert: fs.readFileSync(path.join(__dirname, './ssl/cert.pem')),
+  key: fs.readFileSync(path.join(__dirname, './ssl/key.pem'))
+};
+
+http2.createSecureServer(options, app).listen(3001, () => {
   console.log('listen:3001')
 })

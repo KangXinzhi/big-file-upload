@@ -3,6 +3,9 @@
     "body-parser": "^1.20.1",
     "express": "^4.18.2",
     "fs-extra": "^11.1.0",
-    "multiparty": "^4.2.3"
+    "http2": "^3.3.7",
+    "http2-express-bridge": "^1.0.7",
+    "multiparty": "^4.2.3",
+    "spdy": "^4.0.2"
   }
 }

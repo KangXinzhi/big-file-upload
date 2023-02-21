@@ -6,14 +6,15 @@ import styled from "styled-components";
 import hashWorker from "./utils/hash-worker";
 import WorkerBuilder from "./utils/worker-build";
 
-const CHUNK_SIZE = 500; // 用于设置分片大小
+// http / https
+const http = "https";
+const CHUNK_SIZE = 1024 * 1024 * 10; // 用于设置分片大小 单位b
 
 const UpLoadFile = function () {
   const [fileName, setFileName] = useState("");
   const [fileHash, setFileHash] = useState("")
   const [chunkList, setChunkList] = useState([])
   const [hashPercentage, setHashPercentage] = useState(0)
-
   // 获取文件后缀名
   const getFileSuffix = (fileName) => {
     let arr = fileName.split(".");
@@ -46,7 +47,7 @@ const UpLoadFile = function () {
   // 5.发送合并请求
   const mergeRequest = (hash) => {
     request({
-      url: "http://localhost:3001/merge",
+      url: `${http}://localhost:3001/merge`,
       method: "post",
       headers: {
         "content-type": "application/json"
@@ -60,6 +61,7 @@ const UpLoadFile = function () {
   }
   // 4.上传分片
   const uploadChunks = async (chunksData, hash) => {
+    let time1 = Date.now().valueOf();
     const formDataList = chunksData.map(({ chunk, hash }) => {
       const formData = new FormData()
       formData.append("chunk", chunk);
@@ -70,7 +72,7 @@ const UpLoadFile = function () {
 
     const requestList = formDataList.map(({ formData }, index) => {
       return request({
-        url: "http://localhost:3001/upload",
+        url: `${http}://localhost:3001/upload`,
         data: formData,
         onprogress: e => {
           let list = [...chunksData];
@@ -81,7 +83,8 @@ const UpLoadFile = function () {
     })
     
     Promise.all(requestList).then(() => { // 上传文件
-      
+      var runTime = ((Date.now().valueOf() - time1) / 1000);
+      console.log('上传时间：',runTime, 's')
       setTimeout(() => {
         mergeRequest(hash);// 分片全部上传后发送合并请求
       }, 1000);
@@ -149,7 +152,7 @@ const UpLoadFile = function () {
   // 验证文件是否存在服务器
   const verfileIsExist = async (fileHash, suffix) => {
     const { data } = await request({
-      url: "http://localhost:3001/verFileIsExist",
+      url: `${http}://localhost:3001/verFileIsExist`,
       headers: {
         "content-type": "application/json"
       },
