@@ -3,12 +3,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import request from "./utils/request";
 import styled from "styled-components";
-import hashWorker from "./utils/hash-worker";
+import hashWorker from "./utils/hash-worker2";
 import WorkerBuilder from "./utils/worker-build";
 
 // http / https
 const http = "https";
-const CHUNK_SIZE = 1024 * 1024 * 10; // 用于设置分片大小 单位b
+const CHUNK_SIZE = 1000 * 1000 * 100; // 用于设置分片大小 单位b
 
 const UpLoadFile = function () {
   const [fileName, setFileName] = useState("");
@@ -71,7 +71,7 @@ const UpLoadFile = function () {
     })
 
     const requestList = formDataList.map(({ formData }, index) => {
-      return request({
+      return {
         url: `${http}://localhost:3001/upload`,
         data: formData,
         onprogress: e => {
@@ -79,31 +79,63 @@ const UpLoadFile = function () {
           list[index].progress = parseInt(String((e.loaded / e.total) * 100));
           setChunkList(list)
         }
-      })
+      }
     })
-    
-    Promise.all(requestList).then(() => { // 上传文件
-      var runTime = ((Date.now().valueOf() - time1) / 1000);
-      console.log('上传时间：',runTime, 's')
-      setTimeout(() => {
-        mergeRequest(hash);// 分片全部上传后发送合并请求
-      }, 1000);
 
-    })
+    const requestMax = (list, max=1) => {
+      return new Promise(resolve => {
+        const len = list.length;
+        let idx = 0;
+        let counter = 0;
+        const start = async () => {
+          while (idx < len && max > 0) {
+            max--; // 占用通道
+            console.log(idx, "start");
+            request(requestList[idx]).then(() => {
+              max++; // 释放通道
+              counter++;
+              if (counter === len) {
+                var runTime = ((Date.now().valueOf() - time1) / 1000);
+                console.log('上传时间：', runTime, 's')
+                setTimeout(() => {
+                  mergeRequest(hash);// 分片全部上传后发送合并请求
+                }, 1000);
+                resolve();
+              } else {
+                start();
+              }
+            })
+            idx++;
+          }
+        }
+        start();
+      })
+    }
+    requestMax(requestList, 3)
+    // Promise.all(requestList).then(() => { // 上传文件
+    //   var runTime = ((Date.now().valueOf() - time1) / 1000);
+    //   console.log('上传时间：',runTime, 's')
+    //   setTimeout(() => {
+    //     mergeRequest(hash);// 分片全部上传后发送合并请求
+    //   }, 1000);
+    // })
   }
   // 计算文件hash
   const calculateHash = (chunkList) => {
+    let time1 = Date.now().valueOf();
     return new Promise(resolve => {
       const woker = new WorkerBuilder(hashWorker)
-      console.log('主线程创建worker计算hash值',woker)
+      console.log('主线程创建worker计算hash值', woker)
       woker.postMessage({ chunkList: chunkList })
       woker.onmessage = e => {
-        console.log('主线程接收worker发来的信息 ',e)
+        console.log('主线程接收worker发来的信息 ', e)
         const { percentage, hash } = e.data;
         setHashPercentage(percentage);
         if (hash) {
           // 当hash计算完成时，执行resolve
           resolve(hash)
+          let runTime = ((Date.now().valueOf() - time1) / 1000);
+          console.log('hash计算时间：', runTime, 's')
         }
       }
     })
@@ -118,7 +150,7 @@ const UpLoadFile = function () {
       alert("文件拆分中，请稍后...")
       return;
     }
-    
+
     const hash = await calculateHash(chunkList)// 计算hash
     console.log(hash)
     setFileHash(hash)
@@ -143,9 +175,9 @@ const UpLoadFile = function () {
       const arr = item2.hash.split("-")// 过滤掉已上传的块
       return uploadedChunkIndexList.indexOf(parseInt(arr[arr.length - 1])) === -1;
     })
-    
+
     setChunkList(chunksData)// 保存分片数据
-    
+
     uploadChunks(chunksData, hash)// 开始上传分片
   }
 
@@ -166,7 +198,7 @@ const UpLoadFile = function () {
 
   return (
     <div>
-      <input type="file" onChange={handleFileChange} style={{color: 'white'}}/><br />
+      <input type="file" onChange={handleFileChange} style={{ color: 'white' }} /><br />
       <button onClick={handleUpload}>上传</button>
       <ProgressBox chunkList={chunkList} />
     </div>
@@ -238,7 +270,7 @@ const ProgressBox = ({ chunkList = [], size = 40 }) => {
           <Block key={index} size={size} chunkIndex={index} progress={progress} />
         ))}
       </ChunksProgress>
-      <Label>总进度:{sumProgress.toFixed(2)||0}%</Label>
+      <Label>总进度:{sumProgress.toFixed(2) || 0}%</Label>
     </ProgressWraper >
   )
 }

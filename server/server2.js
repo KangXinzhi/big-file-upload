@@ -27,6 +27,13 @@ const getUploadedChunkList = async (fileHash) => {
   return []
 }
 
+app.get('/test', jsonParser, async (req, res) => {
+  console.log('请求成功')
+  res.send({
+    code: 200,
+  })
+})
+
 app.post('/verFileIsExist', jsonParser, async (req, res) => {
   const { fileHash, suffix } = req.body;
   const filePath = path.resolve(UPLOAD_FILES_DIR, fileHash + "." + suffix);

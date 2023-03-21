@@ -12,7 +12,7 @@ const request = ({
     Object.keys(headers).forEach(key =>
       xhr.setRequestHeader(key, headers[key])
     );
-    xhr.upload.onprogress = onprogress
+    xhr.upload.onprogress = onprogress;
     xhr.send(data);
     xhr.onload = e => {
       resolve({
