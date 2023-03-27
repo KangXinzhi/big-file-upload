@@ -4,11 +4,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import request from "./utils/request";
 import styled from "styled-components";
 import hashWorker from "./utils/hash-worker2";
+import splitFileHash from "./utils/split-file-hash";
 import WorkerBuilder from "./utils/worker-build";
 
 // http / https
-const http = "https";
-const CHUNK_SIZE = 1000 * 1000 * 100; // 用于设置分片大小 单位b
+const http = "http";
+const CHUNK_SIZE = 1000 * 1000 * 1; // 用于设置分片大小 单位b
 
 const UpLoadFile = function () {
   const [fileName, setFileName] = useState("");
@@ -24,23 +25,43 @@ const UpLoadFile = function () {
     return "";
   }
 
-  // 2.文件分片
+ // 2.worker中文件分片
   const splitFile = (file, size = CHUNK_SIZE) => {
-    const fileChunkList = [];
-    let curChunkIndex = 0;
-    while (curChunkIndex <= file.size) {
-      const chunk = file.slice(curChunkIndex, curChunkIndex + size);//Blob.slice方法分割文件
-      fileChunkList.push({ chunk: chunk, })
-      curChunkIndex += size;
-    }
-    return fileChunkList;
+    let time1 = Date.now().valueOf();
+    return new Promise(resolve => {
+      const woker = new WorkerBuilder(splitFileHash)
+      console.log('主线程创建worker分割file', woker)
+      woker.postMessage({ file, size })
+      woker.onmessage = e => {
+        console.log('主线程接收split-file-worker发来的信息 ', e)
+        const { fileChunkList } = e.data;
+        if (fileChunkList) {
+          // 当hash计算完成时，执行resolve
+          resolve(fileChunkList);
+          let runTime = ((Date.now().valueOf() - time1) / 1000);
+          console.log('split-file-worker计算时间：', runTime, 's')
+        }
+      }
+    })
   }
+
+  // 2.文件分片
+  // const splitFile = (file, size = CHUNK_SIZE) => {
+  //   const fileChunkList = [];
+  //   let curChunkIndex = 0;
+  //   while (curChunkIndex <= file.size) {
+  //     const chunk = file.slice(curChunkIndex, curChunkIndex + size); //Blob.slice方法分割文件
+  //     fileChunkList.push({ chunk: chunk, })
+  //     curChunkIndex += size;
+  //   }
+  //   return fileChunkList;
+  // }
   // 1.选择文件
-  const handleFileChange = (e) => {
+  const handleFileChange = async(e) => {
     const { files } = e.target;
     if (files.length === 0) return;
     setFileName(files[0].name);// 保存文件名
-    const chunkList = splitFile(files[0])// 文件分片
+    const chunkList = await splitFile(files[0])// 文件分片
     setChunkList(chunkList);
   }
 
@@ -112,13 +133,6 @@ const UpLoadFile = function () {
       })
     }
     requestMax(requestList, 3)
-    // Promise.all(requestList).then(() => { // 上传文件
-    //   var runTime = ((Date.now().valueOf() - time1) / 1000);
-    //   console.log('上传时间：',runTime, 's')
-    //   setTimeout(() => {
-    //     mergeRequest(hash);// 分片全部上传后发送合并请求
-    //   }, 1000);
-    // })
   }
   // 计算文件hash
   const calculateHash = (chunkList) => {
